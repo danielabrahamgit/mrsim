@@ -1,9 +1,12 @@
 import numpy as np
+import matplotlib.pyplot as plt
+
+from typing import Tuple
+from constants import GAMMA, PI
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.animation import FuncAnimation
 
 class spin:
-
-    # Gyromagnetic ratio rad Hz / Tesla
-    gamma = 2 * np.pi * 42.58e6
 
     def __init__(self, T1: float, T2: float, pos: np.ndarray, M0: float = 1):
         
@@ -19,28 +22,33 @@ class spin:
         self.M0 = M0
         self.Mz = M0
     
-    def d_Mxy_dt(self, Bxy, Bz):
+    def d_Mxy_dt(self, Bxy: np.complex128, Bz: float) -> np.complex128:
         Mxy = self.Mxy
         Mz = self.Mz
-        return -1j * spin.gamma * Bz * Mxy + 1j * spin.gamma * Bxy * Mz - Mxy / self.T2
+        return -1j * GAMMA * Bz * Mxy + 1j * GAMMA * Bxy * Mz - Mxy / self.T2
 
-    def d_Mz_dt(self, Bxy):
+    def d_Mz_dt(self, Bxy: np.complex128) -> float:
         Mxy = self.Mxy
         Mz = self.Mz
         M0 = self.M0
-        return spin.gamma * (Mxy.real * Bxy.imag - Mxy.imag * Bxy.real) - (Mz - M0) / self.T1
+        return GAMMA * (Mxy.real * Bxy.imag - Mxy.imag * Bxy.real) - (Mz - M0) / self.T1
 
-        
+    def fix_lenth(sig: np.ndarray, desired_len: int) -> np.ndarray:
+        diff = desired_len - len(sig)
+        if diff < 0:
+            return sig[:desired_len]
+        elif diff > 0:
+            return np.append(sig, np.zeros(diff, dtype=sig.dtype))
+        else:
+            return sig + 0.0    
     
-    def sim_bloch(self, dt: float, duration: float, Bxy: np.ndarray, Bz: np.ndarray):
+    def sim_bloch(self, dt: float, duration: float, Bxy: np.ndarray, Bz: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         
-        # Make sure that magnetic fields are the right lengths
-        N = int(duration / dt)
-        assert len(Bxy) == len(Bz)
-        assert N == len(Bz)
-
-        # Make time axis
-        time_axis = np.linspace(0, duration, N)
+        # Fix Bxy and Bz lengths to length of time axis
+        time_axis = np.arange(0, duration, dt)
+        N = len(time_axis)
+        Bxy = spin.fix_lenth(Bxy, N)
+        Bz = spin.fix_lenth(Bz, N)
 
         # Return temporal dynamics
         Mxys = np.zeros(N, dtype=np.complex128)
@@ -64,5 +72,35 @@ class spin:
             Mxys[i] = self.Mxy
             Mzs[i] = self.Mz
         
-        return Mxys, Mzs
+        return time_axis, Mxys, Mzs
 
+    def spin_figure_longitudal(self, time_axis: np.ndarray, Mzs: np.ndarray):
+
+        # Make sure lengths are okay
+        assert len(time_axis) == len(Mzs)
+        
+        # Plot Mz
+        plt.figure()
+        plt.title('Longitudal')
+        plt.ylabel(r'$M_z$')
+        plt.xlabel('Time [msec]')
+        plt.plot(time_axis * 1e3, Mzs)
+
+    def spin_figure_transverse(self, time_axis: np.ndarray, Mxys: np.ndarray):
+
+        # Make sure lengths are okay
+        assert len(time_axis) == len(Mxys)
+
+        # Plot magnitude and phase
+        plt.figure()
+        plt.subplot(211)
+        plt.title('Magnitude Transverse')
+        plt.ylabel(r'$|M_{xy}|$')
+        plt.xlabel('Time [msec]')
+        plt.plot(time_axis * 1e3, np.abs(Mxys))
+        plt.subplot(212)
+        plt.title('Phase Transverse')
+        plt.ylabel(r'$\angle{M_{xy}}$ $[^\circ]$')
+        plt.xlabel('Time [msec]')
+        plt.plot(time_axis * 1e3, np.angle(Mxys) * 180 / PI)
+        

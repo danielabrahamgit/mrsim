@@ -6,7 +6,7 @@ from spin import spin
 
 # Simulation Paremters
 dt = 1e-7 # sec
-duration = 20e-3 # sec 
+duration = 100e-3 # sec 
 
 # Sequence object
 seq = sequence(dt, TR=duration)
@@ -17,22 +17,20 @@ spn = spin(T1=100e-3, T2=10e-3, pos=np.array([0, 0, 0.0]))
 # Excitation pulse sequence
 seq.set_excitation_pulses(
     alpha=90,
-    tau=1e-3,
+    tau=5e-3,
     phase=0,
     z=0,
-    dz=1e-2,
+    dz=1e-1,
     t_start=0,
-    TBW=1)
+    TBW=6)
 
 # Simulate sequence
 Bxy = seq.B1
 Bz = seq.Gz * spn.pos[2]
-Mxy, Mz = spn.sim_bloch(dt=dt, duration=duration, Bxy=Bxy, Bz=Bz)
+time_axis, Mxys, Mzs = spn.sim_bloch(dt=dt, duration=duration, Bxy=Bxy, Bz=Bz)
 
+# Plot Spins
+spn.spin_figure_longitudal(time_axis, Mzs)
+spn.spin_figure_transverse(time_axis, Mxys)
 seq.sequence_figure(sigs=['B1', 'Gz'])
-
-plt.figure()
-time_axis = np.linspace(0, duration, int(duration / dt))
-plt.plot(time_axis * 1e3, Mz)
-plt.xlabel('Time [msec]')
 plt.show()
