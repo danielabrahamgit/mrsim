@@ -2,17 +2,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from sequence import sequence
-from spin import spin
+from spins import spins
 
 # Simulation Paremters
-dt = 1e-7 # sec
+dt = 1e-6 # sec
 duration = 100e-3 # sec 
+res = [1e-2, 1e-2, 1e-2] # Resolution in XYZ dirs
+fovs = [5e-2, 5e-2, 1e-2] # FOV in XYZ dirs
 
 # Sequence object
 seq = sequence(dt, TR=duration)
 
 # A single spin object
-spn = spin(T1=100e-3, T2=10e-3, pos=np.array([0, 0, 0.0]))
+spns = spins(res, fovs)
+spns.set_parameter_maps()
+
 
 # Excitation pulse sequence
 seq.set_excitation_pulses(
@@ -20,17 +24,19 @@ seq.set_excitation_pulses(
     tau=5e-3,
     phase=0,
     z=0,
-    dz=1e-1,
+    dz=20e-2,
     t_start=0,
     TBW=6)
 
+kx_extent = 1 / res[0]
+seq.set_gre(0, [-kx_extent/2, kx_extent/2], TE=17e-3)
+
 # Simulate sequence
-Bxy = seq.B1
-Bz = seq.Gz * spn.pos[2]
-time_axis, Mxys, Mzs = spn.sim_bloch(dt=dt, duration=duration, Bxy=Bxy, Bz=Bz)
+pos_probe = np.array([10e-2, 0, -4e-2])
+time_axis, Mxys, Mzs = spns.sim_bloch(dt=dt, duration=duration, seq=seq, pos_probe=pos_probe)
 
 # Plot Spins
-spn.spin_figure_longitudal(time_axis, Mzs)
-spn.spin_figure_transverse(time_axis, Mxys)
-seq.sequence_figure(sigs=['B1', 'Gz'])
+spns.spin_figure_longitudal(time_axis, Mzs)
+spns.spin_figure_transverse(time_axis, Mxys)
+seq.sequence_figure(sigs=['B1', 'Gz', 'Gx', 'Gy'])
 plt.show()

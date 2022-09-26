@@ -9,7 +9,8 @@ class sequence:
     def __init__(self, dt: float, TR: float) -> None:
         self.dt = dt
         self.TR = TR
-        N = len(np.arange(0, TR, dt))
+        self.time_axis = np.arange(0, TR, dt)
+        N = len(self.time_axis)
         self.B1 = np.zeros(N, dtype=np.complex128) # Tesla
         self.Gx = np.zeros(N) # Tesla / m
         self.Gy = np.zeros(N) # Tesla / m
@@ -37,6 +38,32 @@ class sequence:
         self.adc = adc
     
 
+    def set_gre(self, ky: float, kx_range: list, TE: float):
+
+        # Find index of middle of readout
+        rf_peak_ind = np.argmax(np.abs(self.B1))
+        TE_inds = int(TE / self.dt)
+        ro_middle = rf_peak_ind + TE_inds
+
+        # Find start of readout gradient
+        Gx = GMAX
+        kx_total = kx_range[1] - kx_range[0]
+        ro_time = 2 * PI * kx_total / Gx / GAMMA
+        ro_inds = int(ro_time / self.dt)
+        gx_start = ro_middle - ro_inds
+
+        # Set Gx sequence
+        Gx_sig = -Gx * np.ones(ro_inds // 2)
+        Gx_sig = np.append(Gx_sig, np.ones(ro_inds) * Gx)
+        self.Gx[gx_start:gx_start + len(Gx_sig)] = Gx_sig
+
+        # Set Gy sequence
+        gy_time = ro_time / 2
+        gy_inds = int(gy_time / self.dt)
+        Gy = 2 * PI * ky / gy_time / GAMMA
+        self.Gy[gx_start:gx_start + gy_inds] = Gy * np.ones(gy_inds)
+
+
     def set_excitation_pulses(self, 
                               alpha: float, # deg 
                               tau: float, # sec
@@ -50,8 +77,8 @@ class sequence:
         assert t_start + tau * 1.5 < self.TR
 
         # Start/stop indices
-        start = int(t_start / self.dt)
-        stop = int((t_start + tau) / self.dt)
+        start = np.argmin(np.abs(self.time_axis - t_start))
+        stop = np.argmin(np.abs(self.time_axis - t_start - tau))
 
         # Calculate B1 term
         alpha_rad = alpha * PI / 180
